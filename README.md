@@ -1,7 +1,7 @@
 LibHueEnt - A library to control Hue entertainment areas from C
 ---------------------------------------------------------------
 There are two main parts to this project:
-* The LibHueEnt library which can be used to control up to 10 hue lights simultaneously with up to 25 updates per second. It is _not_ suitable for infrequently toggling single lamps.
+* The LibHueEnt library which can be used to control up to 10 hue lights simultaneously with up to 25 updates per second. It is _not_ suitable for infrequently toggling single lamps. See [API docs](https://raw.githack.com/daniel1111/HueLibEnt/master/docs/index.html)
 * HueVis - An audio visualiser for hue lights using LibHueEnt, heavily based on the [CAVA project](https://github.com/karlstav/cava/)
 
 There is also an additional example app (BasicColourFade) which is a basic example of using LibHueEnt to cycle though colours on each bulb in the entertainment area in turn. Unlike HueVis, this app isn't capable of registering itself with the bridge, so that needs to be done manually using the REST API on the bridge (for HueVis).
