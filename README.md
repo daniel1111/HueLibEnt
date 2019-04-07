@@ -1,5 +1,3 @@
-# New Document
-
 LibHueEnt - A library to control Hue entertainment areas from C
 ---------------------------------------------------------------
 There are two main parts to this project:
@@ -73,6 +71,3 @@ LibHueEnt:
 HueVis:
 * Most settings available in the CAVA project currently have hard-coded values. Some of these should probably be exposed in the config file
 * Other modes. The code is structured to allow adding something other than CAVA to process the audio at some point. CAVA works well, but other options could be interesting. In particular, a mode that uses varying colour and the same time as different bulbs doing different things would be good
-
-
-
