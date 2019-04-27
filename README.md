@@ -16,9 +16,9 @@ Building
 
 Debian:
 
-    apt-get install make libconfig-dev libssl-dev libjson-c-dev libfftw3-dev libpulse-dev libcurl4-gnutls-dev
+    apt-get install make libconfig-dev libssl-dev libjson-c-dev libfftw3-dev libpulse-dev libcurl4-gnutls-dev cmake
 
-Then run `make` in the repository root.
+Then run `cmake .` followed by `make` in the repository root.
 
 
 ## Usage
@@ -29,10 +29,9 @@ BasicColourFade is intended to be a simple example of using LibHueEnt, and is mi
 
 So, to use it:
 1. Either follow the instructions on the [Hue website](https://developers.meethue.com/develop/hue-entertainment/philips-hue-entertainment-api/) to register with the bridge and get a username & clientkey, or use HueVis to register with the bridge and take its credentials from the generated bridge_credentials.conf file
-2. Change into the examples/BasicColourFade directory
-3. Run `./bcf -a <ip address> -i <username> -p <clientkey>`
+2. From the root directory, run `./bin/bcf -a <ip address> -i <username> -p <clientkey>`
 
-All going well, you should something along the line of:
+All going well, you should something along the lines of:
 
     Getting entertainment areas
     Enabling entertainment area [Entertainment area 1]
@@ -43,7 +42,7 @@ All going well, you should something along the line of:
 And each light in the entertainment cycling though colours in turn.
 
 ## HueVis
-HueVis is really the reason LibHueEnt exists - I wanted a music visualiser for Hue lights, but couldn't find anything that would use the entertainment area stuff that was recently(-ish) added to Hue.
+HueVis is really the reason LibHueEnt exists - I wanted a music visualiser for Hue lights, but couldn't find anything for Linux that would use the entertainment area stuff that was recently(-ish) added to Hue.
 All the logic for audio capture and processing is pretty much ripped off from the [CAVA project](https://github.com/karlstav/cava/), which is designed to show a bar spectrum audio visualizer on the console.
 HueVis currently has two modes of operation (set in huevis.conf):
 1. cava_mode=1 - The brightness of each bulb represents what would have been a bar in the CAVA output. This means that all lamps are always the same colour, and the brighness of each light is (generally) different
@@ -55,17 +54,26 @@ The `huevis.conf` file includes comments for the few options HueVis currently ha
 * squeezelite - Gets audio from a running instance of [squeezelite](https://github.com/ralph-irving/squeezelite). Note that must be built with visualiser support and the `-v` parameter passed to it
  
 ### Usage
-After building, the first step is to register HueVis with the bridge. Change into the `examples/HueVis` directory, press the link button on the bridge and then _within 30 seconds_ run `./HueVis -r <ip address of bridge>`. HueVis should then register with the bridge and write the connection details to a `bridge_credentials.conf` file.
+After building, the first step is to register HueVis with the bridge. From the root directory, press the link button on the bridge and then _within 30 seconds_ run `./bin/HueVis -r <ip address of bridge>`. HueVis should then register with the bridge and write the connection details to a `bridge_credentials.conf` file.
 
 ### Example
 Example of HueVis running:
+
+    $ ./bin/huevis 
+    Getting entertainment areas
+    Enabling entertainment area [Entertainment area 1]
+    Making DTLS connection to bridge
+    Init audio
+    Using audio source: alsa_output.pci-0000_00_1b.0.analog-stereo.monitor
+    Start audio capture & processing
+    Running...
+
 
 [![HueVis](http://img.youtube.com/vi/OZpMm7RhmM8/0.jpg)](https://youtu.be/OZpMm7RhmM8)
 
 ## TODO
 LibHueEnt:
 * Allow automatic bridge discovery - instead of always requiring an IP address to be entered - by following the notes on the [Hue website](https://developers.meethue.com/develop/application-design-guidance/hue-bridge-discovery/)
-* Use cmake instead of the handcrafted makefile which is probably very Debian Stretch specific 
 * A better example - more involved than BasicColourFade e.g. with registration, maybe using multiple entertainment areas, etc
 
 HueVis:

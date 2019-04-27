@@ -117,7 +117,7 @@ static int getPulseDefaultSink(void **ctx, struct audio_data *audio, config_t *c
   *ctx = calloc(1, sizeof(struct input_pulse_ctx));
   struct input_pulse_ctx *c = *ctx;
   config_setting_t *cfg_root;
-  const char *str;
+  const char *str = NULL;
 
   c->audio = audio;
   pa_mainloop_api *mainloop_api;
