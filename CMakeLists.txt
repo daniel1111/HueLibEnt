@@ -42,3 +42,11 @@ target_link_libraries(huevis PUBLIC rt)
 target_link_libraries(huevis PUBLIC config)
 target_link_libraries(huevis PUBLIC pulse)
 target_link_libraries(huevis PUBLIC pulse-simple)
+
+# Example: Hutil
+add_executable(hutil examples/Hutil/main.c)
+target_link_libraries(hutil PUBLIC HueEnt)
+target_link_libraries(hutil PUBLIC config)
+
+
+

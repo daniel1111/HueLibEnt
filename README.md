@@ -71,6 +71,25 @@ Example of HueVis running:
 
 [![HueVis](http://img.youtube.com/vi/OZpMm7RhmM8/0.jpg)](https://youtu.be/OZpMm7RhmM8)
 
+## Hutil
+A simple utility that can register with the bridge, show the whitelist (registered applications) and list configured entertainment areas.
+
+### Example
+Registering; after pressing the link button on th bridge:
+
+    $ ./bin/hutil -r 192.0.2.10
+    Registered with hue bridge, config saved
+
+Showing entertainment areas:
+
+    $ ./bin/hutil -e
+
+    Entertainment areas:
+    ID      Name                             Light IDs
+    6       Entertainment area 1             12 13 15 14 
+
+
+
 ## TODO
 LibHueEnt:
 * Allow automatic bridge discovery - instead of always requiring an IP address to be entered - by following the notes on the [Hue website](https://developers.meethue.com/develop/application-design-guidance/hue-bridge-discovery/)
