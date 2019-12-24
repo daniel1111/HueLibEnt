@@ -89,6 +89,25 @@ Showing entertainment areas:
     6       Entertainment area 1             12 13 15 14 
 
 
+## Hdmx
+HDmx is a simple DMX to Hue Entertainment Brudge. It is missing basic features like being able register itself with the bridge and using a config file, so everything must supplied on the command line.
+
+So, to use it:
+1. Either follow the instructions on the [Hue website](https://developers.meethue.com/develop/hue-entertainment/philips-hue-entertainment-api/) to register with the bridge and get a username & clientkey, or use Hutil to register with the bridge and take its credentials from the generated bridge_credentials.conf file
+2. From the root directory, run `./bin/hdmx -a <ip address> -i <username> -p <clientkey> -e <area>`
+
+<area> is the order the area's are listed, not
+the Area ID.
+All going well, you should something along the lines of:
+
+    Getting entertainment areas
+    2 lights found in entertainment area [Entertainment area 1]
+    Enabling entertainment area [Entertainment area 1]
+    Making DTLSc connection to bridge
+    Running...
+    Light = 0 (id = 12)
+
+Once running this creates an ART-NET node. Each light appears as a 3 channel RGB device, and can be controlled by any DMX software or hardware that supports ART_NET.
 
 ## TODO
 LibHueEnt:
