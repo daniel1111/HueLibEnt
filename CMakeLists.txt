@@ -31,6 +31,10 @@ target_include_directories(HueEnt
 add_executable(bcf examples/BasicColourFade/main.c)
 target_link_libraries(bcf PUBLIC HueEnt)
 
+# Example: Hdmx
+add_executable(hdmx examples/Hdmx/main.c)
+target_link_libraries(hdmx PUBLIC HueEnt)
+
 # Example: HueVis
 add_executable(huevis examples/HueVis/huevis.c examples/HueVis/input_pulse.c examples/HueVis/input_squeezelite.c examples/HueVis/process_cava.c)
 target_link_libraries(huevis PUBLIC HueEnt)
