@@ -104,8 +104,6 @@ All going well, you should something along the lines of:
     2 lights found in entertainment area [Entertainment area 1]
     Enabling entertainment area [Entertainment area 1]
     Making DTLSc connection to bridge
-    Running...
-    Light = 0 (id = 12)
 
 Once running this creates an ART-NET node. Each light appears as a 3 channel RGB device, and can be controlled by any DMX software or hardware that supports ART_NET.
 
