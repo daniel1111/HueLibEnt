@@ -1,4 +1,8 @@
 /*
+ * 
+ * Copyright (c) 2019, Ian Stephenson <ian@dctsystems.co.uk>
+ *
+ * Based on code by:
  * Copyright (c) 2019, Daniel Swann <github@dswann.co.uk>
  * All rights reserved.
  * 
@@ -26,6 +30,8 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <ifaddrs.h>
+
 
 #include "dtls.h"
 #include "hue_entertainment.h"
@@ -49,6 +55,73 @@ void print_usage(const char* name)
   printf("    -p <psk>         Pre Shared Key to use when connecting to bridge\n");
   printf("    -d <level>       Debug level 0-3. Default: 1 (errors only)\n");
   printf("\n");
+}
+
+void sendPollReply(struct sockaddr_in *sender,int sockfd)
+{
+
+
+    struct sockaddr_in     servaddr; 
+    memset(&servaddr, 0, sizeof(servaddr)); 
+      
+    // Filling server information 
+    servaddr.sin_family = AF_INET; 
+    servaddr.sin_port = sender->sin_port; 
+    servaddr.sin_addr = sender->sin_addr; 
+      
+    char buffer[240]; 
+    memset(buffer,0,240);
+    sprintf(buffer,"Art-Net");
+    buffer[8]=0;
+    buffer[9]=0x21;
+    //My IP
+    struct ifaddrs * ifAddrStruct = NULL;
+    getifaddrs(&ifAddrStruct);
+    struct ifaddrs * ifa = NULL;
+    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next)
+	{
+	if (ifa->ifa_addr->sa_family == AF_INET)
+		{
+		struct in_addr addr;
+		addr=((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+		if(*(unsigned char *)&addr!=127)
+			{
+			*(uint32_t *)(buffer+10)=addr.s_addr;
+			//printf("%d.%d.%d.%d\n",buffer[10],buffer[11],buffer[12],buffer[13]);
+			}
+		}
+	}
+    if (ifAddrStruct != NULL)
+	freeifaddrs(ifAddrStruct);
+    //My Port
+    buffer[15]=ARTNET_PORT& 0xff;;
+    buffer[14]=ARTNET_PORT>>8;;
+    //Pretty names
+    sprintf(buffer+26,"Philips Hue");
+    sprintf(buffer+44,"Art-Net to Philips Hue Bridge");
+    //Number of Ports
+    buffer[173]=1;
+    buffer[174]=0x80;
+    buffer[182]=0x80;
+    buffer[190]=0x01;
+
+    //BindIP?
+    buffer[207]=buffer[10];
+    buffer[208]=buffer[11];
+    buffer[209]=buffer[12];
+    buffer[210]=buffer[13];
+
+
+
+    int n=sendto(sockfd, buffer, 240, 
+        MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+            sizeof(servaddr)); 
+    if(n==-1)
+	{
+	    printf("Poll Reply Error %d\n",n);
+	    exit(1);
+	}
+
 }
 
 int main (int argc, char **argv)
@@ -233,43 +306,88 @@ int main (int argc, char **argv)
 			&upd_len); 
 
 
-	    //Maginc Number
+	    //Magic Number
 	    if(buffer[7]!=0)
 		continue;
 	    if(strcmp(buffer,"Art-Net")!=0)
 		continue;
 
-	    //Opcode0x5000
-	    if(buffer[8]!=0)
+	    //Opcode
+            int opCodeHandled;
+            if(buffer[8]!=0)
+		{
+		printf("Bad Opcode\n");
 		continue;
-	    if(buffer[9]!=0x50)
-		continue;
+		}
 
-	    //Protocaol (14)
-	    if(buffer[10]!=0)
-		continue;
-	    if(buffer[11]!=14)
-		continue;
+	    switch(buffer[9])
+		{
+	        case 0x20:
+			{
+			if(debug_level>=MSG_INFO)
+				{
+				printf("Poll:");
+				printf("%s:",inet_ntoa(cliaddr.sin_addr));
+				printf("%d\n",ntohs(cliaddr.sin_port));
+				}
+			sendPollReply(&cliaddr,sockfd);
+			break;
+			}
+	        case 0x80:
+			{
+			if(debug_level>=MSG_INFO)
+				printf("TodRequest\n");
+
+			break;;
+			}
+	        case 0x21:
+			{
+			if(debug_level>=MSG_INFO)
+				{
+				printf("Poll Reply\n");
+				printf("%s\n",buffer+26);
+				printf("%s\n",buffer+44);
+				printf("%s\n",buffer+108);
+				break;
+				}
+			}
+
+	        case 0x50:
+			{
+			//Protocaol (14)
+			 if(buffer[10]!=0)
+				break;
+			 if(buffer[11]!=14)
+				break;
 
 
-	int dmx_count=buffer[16];
-        dmx_count=(dmx_count<<8)+buffer[17];
-	if(dmx_count>3*light_count)
-		dmx_count=3*light_count;
+			int dmx_count=buffer[16];
+			dmx_count=(dmx_count<<8)+buffer[17];
+			if(debug_level>=MSG_DEBUG)
+				printf("Got %d Channel Data\n",dmx_count);
 
-	unsigned char *data=buffer+18;
-	    int light;
+			if(dmx_count>3*light_count)
+				dmx_count=3*light_count;
 
-	    for(light=0;light<dmx_count/3;light++)
-	    {
-	    int r,b,g;
-	    r=data[0];
-	    g=data[1];
-	    b=data[2];
+			unsigned char *data=buffer+18;
+			    int light;
 
-	    hue_ent_set_light(&ctx_ent, light, r << 8, g << 8, b << 8);
-   	    data+=3;
-	    }
+			    for(light=0;light<dmx_count/3;light++)
+			    {
+			    int r,b,g;
+			    r=data[0];
+			    g=data[1];
+			    b=data[2];
+
+			    hue_ent_set_light(&ctx_ent, light, r << 8, g << 8, b << 8);
+			    data+=3;
+			    }
+			}
+		    break;
+	    default:
+		    printf("Unknown Packet:%x:%x\n",buffer[8],buffer[9]);
+	        }
+		
 
 	    /* Generate message */
 	    hue_ent_get_message(&ctx_ent, &msg_buf, &buf_len);
