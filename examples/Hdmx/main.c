@@ -42,11 +42,15 @@
 
 #define ARTNET_PORT 6454
 #define MAX_ARTNET_SIZE 1024
+#define ARTNET_OP_POLL 0x20
+#define ARTNET_OP_POLL_REPLY 0x21
+#define ARTNET_OP_DMX 0x50
+#define ARTNET_OP_TOD_REQUEST 0x80
 
 void print_usage(const char* name)
 {
-  printf("\nHue lights colour cycle test\n");
-  printf("Usage: %s -a <ip address> -i <identity> -p <psk> [-d <debug level>]\n\n", name);
+  printf("\nArt-Net to Hue lights Bridge\n");
+  printf("Usage: %s -a <ip address> -e <area> -i <identity> -p <psk> [-d <debug level>]\n\n", name);
 
   printf("Parameters:\n");
   printf("    -a <ip address>  IP address of Hue Bridge\n");
@@ -57,7 +61,7 @@ void print_usage(const char* name)
   printf("\n");
 }
 
-void sendPollReply(struct sockaddr_in *sender,int sockfd)
+void sendPollReply(struct sockaddr_in *sender,int artnetSock)
 {
 
 
@@ -73,7 +77,7 @@ void sendPollReply(struct sockaddr_in *sender,int sockfd)
     memset(buffer,0,240);
     sprintf(buffer,"Art-Net");
     buffer[8]=0;
-    buffer[9]=0x21;
+    buffer[9]=ARTNET_OP_POLL_REPLY;
     //My IP
     struct ifaddrs * ifAddrStruct = NULL;
     getifaddrs(&ifAddrStruct);
@@ -113,7 +117,7 @@ void sendPollReply(struct sockaddr_in *sender,int sockfd)
 
 
 
-    int n=sendto(sockfd, buffer, 240, 
+    int n=sendto(artnetSock, buffer, 240, 
         MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
             sizeof(servaddr)); 
     if(n==-1)
@@ -269,12 +273,12 @@ int main (int argc, char **argv)
    /* Hue Is Set Up */
 
    /* Now listen on UDP */
-   int sockfd; 
+   int artnetSock; 
     char buffer[1024]; 
     struct sockaddr_in servaddr, cliaddr; 
       
     // Creating socket file descriptor 
-    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+    if ( (artnetSock = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
         perror("socket creation failed"); 
         exit(EXIT_FAILURE); 
     } 
@@ -288,12 +292,17 @@ int main (int argc, char **argv)
     servaddr.sin_port = htons(ARTNET_PORT); 
       
     // Bind the socket with the server address 
-    if ( bind(sockfd, (const struct sockaddr *)&servaddr,  
+    if ( bind(artnetSock, (const struct sockaddr *)&servaddr,  
             sizeof(servaddr)) < 0 ) 
     { 
         perror("bind failed"); 
         exit(EXIT_FAILURE); 
     } 
+
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    setsockopt(artnetSock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
 
 
    unsigned char sequence;
@@ -301,94 +310,95 @@ int main (int argc, char **argv)
 	    {
 	    int upd_len = sizeof(cliaddr);  //len is value/resuslt 
 	  
-	    int n = recvfrom(sockfd, (char *)buffer, MAX_ARTNET_SIZE,  
-			MSG_WAITALL, ( struct sockaddr *) &cliaddr, 
+	    int n = recvfrom(artnetSock, (char *)buffer, MAX_ARTNET_SIZE,  
+			0, ( struct sockaddr *) &cliaddr, 
 			&upd_len); 
-
-
-	    //Magic Number
-	    if(buffer[7]!=0)
-		continue;
-	    if(strcmp(buffer,"Art-Net")!=0)
-		continue;
-
-	    //Opcode
-            int opCodeHandled;
-            if(buffer[8]!=0)
+	    if(n>10)
 		{
-		printf("Bad Opcode\n");
-		continue;
+		    //Magic Number
+		    if(buffer[7]!=0 || strcmp(buffer,"Art-Net")!=0)
+			{
+			printf("Bad Magic\n");
+			continue;
+			}
+
+		    //Opcode
+		    int opCodeHandled;
+		    if(buffer[8]!=0)
+			{
+			printf("Bad Opcode\n");
+			continue;
+			}
+
+		    switch(buffer[9])
+			{
+			case ARTNET_OP_POLL:
+				{
+				if(debug_level>=MSG_INFO)
+					{
+					printf("Poll:");
+					printf("%s:",inet_ntoa(cliaddr.sin_addr));
+					printf("%d\n",ntohs(cliaddr.sin_port));
+					}
+				sendPollReply(&cliaddr,artnetSock);
+				break;
+				}
+			case ARTNET_OP_TOD_REQUEST:
+				{
+				if(debug_level>=MSG_INFO)
+					printf("TodRequest\n");
+
+				break;;
+				}
+			case ARTNET_OP_POLL_REPLY:
+				{
+				if(debug_level>=MSG_INFO)
+					{
+					printf("Poll Reply\n");
+					printf("%s\n",buffer+26);
+					printf("%s\n",buffer+44);
+					printf("%s\n",buffer+108);
+					break;
+					}
+				}
+
+			case ARTNET_OP_DMX:
+				{
+				//Protocaol (14)
+				 if(buffer[10]!=0)
+					break;
+				 if(buffer[11]!=14)
+					break;
+
+
+				int dmx_count=buffer[16];
+				dmx_count=(dmx_count<<8)+buffer[17];
+				if(debug_level>=MSG_DEBUG)
+					printf("Got %d Channel Data\n",dmx_count);
+
+				if(dmx_count>3*light_count)
+					dmx_count=3*light_count;
+
+				unsigned char *data=buffer+18;
+				    int light;
+
+				    for(light=0;light<dmx_count/3;light++)
+				    {
+				    int r,b,g;
+				    r=data[0];
+				    g=data[1];
+				    b=data[2];
+
+				    hue_ent_set_light(&ctx_ent, light, r << 8, g << 8, b << 8);
+				    data+=3;
+				    }
+				}
+			    break;
+		    default:
+			    printf("Unknown Packet:%x:%x\n",buffer[8],buffer[9]);
+			}
 		}
-
-	    switch(buffer[9])
-		{
-	        case 0x20:
-			{
-			if(debug_level>=MSG_INFO)
-				{
-				printf("Poll:");
-				printf("%s:",inet_ntoa(cliaddr.sin_addr));
-				printf("%d\n",ntohs(cliaddr.sin_port));
-				}
-			sendPollReply(&cliaddr,sockfd);
-			break;
-			}
-	        case 0x80:
-			{
-			if(debug_level>=MSG_INFO)
-				printf("TodRequest\n");
-
-			break;;
-			}
-	        case 0x21:
-			{
-			if(debug_level>=MSG_INFO)
-				{
-				printf("Poll Reply\n");
-				printf("%s\n",buffer+26);
-				printf("%s\n",buffer+44);
-				printf("%s\n",buffer+108);
-				break;
-				}
-			}
-
-	        case 0x50:
-			{
-			//Protocaol (14)
-			 if(buffer[10]!=0)
-				break;
-			 if(buffer[11]!=14)
-				break;
-
-
-			int dmx_count=buffer[16];
-			dmx_count=(dmx_count<<8)+buffer[17];
-			if(debug_level>=MSG_DEBUG)
-				printf("Got %d Channel Data\n",dmx_count);
-
-			if(dmx_count>3*light_count)
-				dmx_count=3*light_count;
-
-			unsigned char *data=buffer+18;
-			    int light;
-
-			    for(light=0;light<dmx_count/3;light++)
-			    {
-			    int r,b,g;
-			    r=data[0];
-			    g=data[1];
-			    b=data[2];
-
-			    hue_ent_set_light(&ctx_ent, light, r << 8, g << 8, b << 8);
-			    data+=3;
-			    }
-			}
-		    break;
-	    default:
-		    printf("Unknown Packet:%x:%x\n",buffer[8],buffer[9]);
-	        }
 		
-
 	    /* Generate message */
 	    hue_ent_get_message(&ctx_ent, &msg_buf, &buf_len);
 
