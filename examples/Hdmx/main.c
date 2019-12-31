@@ -73,7 +73,7 @@ void sendPollReply(struct sockaddr_in *sender,int artnetSock)
     servaddr.sin_port = sender->sin_port; 
     servaddr.sin_addr = sender->sin_addr; 
       
-    char buffer[240]; 
+    uint8_t buffer[240]; 
     memset(buffer,0,240);
     sprintf(buffer,"Art-Net");
     buffer[8]=0;
