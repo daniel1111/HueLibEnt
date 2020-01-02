@@ -274,7 +274,7 @@ int main (int argc, char **argv)
 
    /* Now listen on UDP */
    int artnetSock; 
-    char buffer[1024]; 
+    uint8_t buffer[MAX_ARTNET_SIZE]; 
     struct sockaddr_in servaddr, cliaddr; 
       
     // Creating socket file descriptor 
@@ -304,7 +304,7 @@ int main (int argc, char **argv)
     tv.tv_usec = 0;
     setsockopt(artnetSock, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv));
 
-
+   printf("Listening For Art-Net Data...\n");
    unsigned char sequence;
     while(1)
 	    {
