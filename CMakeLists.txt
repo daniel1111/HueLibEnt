@@ -18,9 +18,9 @@ target_link_libraries(HueEnt OpenSSL::SSL)
 # json-c
 target_link_libraries(HueEnt json-c)
 
-
+set_property(TARGET HueEnt PROPERTY C_STANDARD 99)
 target_include_directories(HueEnt
-    PUBLIC 
+    PUBLIC
         $<INSTALL_INTERFACE:include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
@@ -30,10 +30,12 @@ target_include_directories(HueEnt
 # Example: BasicColourFade
 add_executable(bcf examples/BasicColourFade/main.c)
 target_link_libraries(bcf PUBLIC HueEnt)
+set_property(TARGET bcf PROPERTY C_STANDARD 99)
 
 # Example: Hdmx
 add_executable(hdmx examples/Hdmx/main.c)
 target_link_libraries(hdmx PUBLIC HueEnt)
+set_property(TARGET hdmx PROPERTY C_STANDARD 99)
 
 # Example: HueVis
 add_executable(huevis examples/HueVis/huevis.c examples/HueVis/input_pulse.c examples/HueVis/input_squeezelite.c examples/HueVis/process_cava.c)
@@ -46,11 +48,10 @@ target_link_libraries(huevis PUBLIC rt)
 target_link_libraries(huevis PUBLIC config)
 target_link_libraries(huevis PUBLIC pulse)
 target_link_libraries(huevis PUBLIC pulse-simple)
+set_property(TARGET huevis PROPERTY C_STANDARD 99)
 
 # Example: Hutil
 add_executable(hutil examples/Hutil/main.c)
 target_link_libraries(hutil PUBLIC HueEnt)
 target_link_libraries(hutil PUBLIC config)
-
-
-
+set_property(TARGET hutil PROPERTY C_STANDARD 99)
