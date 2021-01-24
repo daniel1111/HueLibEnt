@@ -238,7 +238,9 @@ int dtls_connect(struct dtls_ctx *ctx, const char *address, int port)
 
   SSL_CTX_set_psk_client_callback(ctx->ssl_ctx, psk_cb);
 
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
   SSL_CTX_set_ciphersuites(ctx->ssl_ctx, "TLS_PSK_WITH_AES_128_GCM_SHA256");
+#endif
 
 #ifdef __APPLE__
   SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_QUERY_MTU);

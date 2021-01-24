@@ -17,6 +17,7 @@
 #include <openssl/ssl.h>
 #include <openssl/conf.h>
 #include <openssl/engine.h>
+#include <openssl/opensslv.h>
 #include <math.h>
 #include <ctype.h>
 #include "debug.h"
