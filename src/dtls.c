@@ -5,6 +5,8 @@
 
 #include "dtls.h"
 
+#define MAX_PAYLOAD_SIZE 1350
+
 static int dtls_ctx_index;
 
 static void debug(struct dtls_ctx *ctx, int level, char *fmt, ...)
@@ -232,20 +234,32 @@ int dtls_connect(struct dtls_ctx *ctx, const char *address, int port)
     return -1;
   }
 
-  ctx->ssl_ctx = SSL_CTX_new(DTLS_client_method());
+  ctx->ssl_ctx = SSL_CTX_new(DTLSv1_2_client_method());
 
   SSL_CTX_set_psk_client_callback(ctx->ssl_ctx, psk_cb);
+
+  SSL_CTX_set_ciphersuites(ctx->ssl_ctx, "TLS_PSK_WITH_AES_128_GCM_SHA256");
+
+#ifdef __APPLE__
+  SSL_CTX_set_options(ctx->ssl_ctx, SSL_OP_NO_QUERY_MTU);
+#endif
 
   ctx->ssl = SSL_new(ctx->ssl_ctx);
 
   /* Save a reference to the dtls ctx struct so callback can access it */
   SSL_set_ex_data(ctx->ssl, dtls_ctx_index, ctx);
 
+#ifdef __APPLE__
+  SSL_set_mtu(ctx->ssl, MAX_PAYLOAD_SIZE);
+#endif
+
   /* Create BIO, connect and set to already connected */
   ctx->bio = BIO_new_dgram(ctx->fd, BIO_CLOSE);
   connect(ctx->fd, (struct sockaddr *) &ctx->remote_addr, sizeof(struct sockaddr_in));
   BIO_ctrl(ctx->bio, BIO_CTRL_DGRAM_SET_CONNECTED, 0, &ctx->remote_addr);
-
+#ifdef __APPLE__
+  BIO_ctrl(ctx->bio, BIO_CTRL_DGRAM_SET_MTU, MAX_PAYLOAD_SIZE, NULL);
+#endif
   SSL_set_bio(ctx->ssl, ctx->bio, ctx->bio);
 
   retval = SSL_connect(ctx->ssl);

@@ -36,6 +36,7 @@ add_executable(hdmx examples/Hdmx/main.c)
 target_link_libraries(hdmx PUBLIC HueEnt)
 
 # Example: HueVis
+IF(NOT CMAKE_HOST_APPLE)
 add_executable(huevis examples/HueVis/huevis.c examples/HueVis/input_pulse.c examples/HueVis/input_squeezelite.c examples/HueVis/process_cava.c)
 target_link_libraries(huevis PUBLIC HueEnt)
 find_package (Threads)
@@ -46,6 +47,7 @@ target_link_libraries(huevis PUBLIC rt)
 target_link_libraries(huevis PUBLIC config)
 target_link_libraries(huevis PUBLIC pulse)
 target_link_libraries(huevis PUBLIC pulse-simple)
+ENDIF(NOT CMAKE_HOST_APPLE)
 
 # Example: Hutil
 add_executable(hutil examples/Hutil/main.c)
