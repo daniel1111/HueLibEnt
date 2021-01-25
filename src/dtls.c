@@ -234,8 +234,8 @@ int dtls_connect(struct dtls_ctx *ctx, const char *address, int port)
     return -1;
   }
 
-  ctx->ssl_ctx = SSL_CTX_new(DTLSv1_2_client_method());
-
+  ctx->ssl_ctx = SSL_CTX_new(DTLS_client_method());
+  SSL_CTX_set_min_proto_version(ctx->ssl_ctx, DTLS1_2_VERSION);
   SSL_CTX_set_psk_client_callback(ctx->ssl_ctx, psk_cb);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
