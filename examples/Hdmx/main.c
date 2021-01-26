@@ -116,9 +116,14 @@ void sendPollReply(struct sockaddr_in *sender,int artnetSock)
     buffer[210]=buffer[13];
 
 
+    int flags = 0;
+
+#ifdef MSG_CONFIRM
+    flags = MSG_CONFIRM;
+#endif
 
     int n=sendto(artnetSock, buffer, 240, 
-        MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+        flags, (const struct sockaddr *) &servaddr,
             sizeof(servaddr)); 
     if(n==-1)
 	{
