@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <libconfig.h>
 
-#include "dtls.h"
+#include "hue_dtls.h"
 #include "hue_entertainment.h"
 #include "hue_rest.h"
 
@@ -15,7 +15,7 @@
 #define DTLS_PORT 2100
 #define SSL_PORT  443
 
-int debug_level = MSG_ERR;
+int debug_level = HUE_MSG_ERR;
 
 
 /* Get credentials to connect to the bridge. If cmdline_ipaddress is null, get config from file. If it's set, try to
@@ -52,7 +52,7 @@ int get_bridge_credentials(const char *name, const char *credentials_filename, c
     struct hue_rest_ctx ctx_hr;
 
     hue_rest_init();
-    hue_rest_init_ctx(&ctx_hr, NULL, cmdline_ipaddress, SSL_PORT, "", MSG_ERR);
+    hue_rest_init_ctx(&ctx_hr, NULL, cmdline_ipaddress, SSL_PORT, "", HUE_MSG_ERR);
     retval = hue_rest_register(&ctx_hr, &out_username, &out_clientkey);
     if (retval)
     {
@@ -218,7 +218,7 @@ int main (int argc, char **argv)
   char connection_ip[LEN_IP] = "";
 
   int retval;
-  struct dtls_ctx ctx_dtls;
+  struct hue_dtls_ctx ctx_dtls;
   struct hue_ent_ctx ctx_ent;
   struct hue_rest_ctx ctx_hr;
   struct hue_entertainment_area *ent_areas;

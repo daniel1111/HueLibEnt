@@ -1,6 +1,6 @@
 #pragma once
 
-#include "debug.h"
+#include "hue_debug.h"
 
 
 
@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <json-c/json.h>
 
+#define HUE_ENTERTAINMENT_API_NEEDED "1.22.0"
 
 #define AREA_NAME_LEN       33
 #define MAX_LIGHTS_PER_AREA 10
@@ -64,7 +65,6 @@
 #define HUE_ERR_FACTORY_NEW                     802
 #define HUE_ERR_INVALID_STATE                   803
 
-
 struct hue_entertainment_area
 {
   uint16_t area_id;
@@ -83,9 +83,10 @@ struct hue_whitelist_entry
 
 struct hue_rest_ctx
 {
-  debug_cb_t debug_callback;
+  hue_debug_cb_t debug_callback;
   int  debug_level;
   void *user_data;
+  char *apiversion;
   char *username;
   char *clientkey;
   char *address;
@@ -136,7 +137,7 @@ void hue_rest_cleanup();
 
       0 on success, non-zero otherwise
 */
-int hue_rest_init_ctx(struct hue_rest_ctx *ctx, debug_cb_t debug_callback, const char *address, int port, const char *username, int debug_level);
+int hue_rest_init_ctx(struct hue_rest_ctx *ctx, hue_debug_cb_t debug_callback, const char *address, int port, const char *username, int debug_level);
 
 /* Function: hue_rest_cleanup_ctx
 
@@ -163,6 +164,9 @@ void hue_rest_cleanup_ctx(struct hue_rest_ctx *ctx);
       0 on success, non-zero otherwise
 */
 int hue_rest_activate_stream(struct hue_rest_ctx *ctx, int group);
+
+/* TODO */
+int hue_rest_delete_user(struct hue_rest_ctx *ctx, const char *username);
 
 /* Function: hue_rest_get_ent_groups
 
@@ -199,6 +203,21 @@ int hue_rest_get_whitelist(struct hue_rest_ctx *ctx, struct hue_whitelist_entry 
 /* TODO */
 int hue_rest_delete_user(struct hue_rest_ctx *ctx, const char *username);
 
+/* Function: hue_rest_validate_apiversion
+
+   Check if apiversion of bridge is compatible.
+
+   Parameters:
+   
+         ctx - hue_rest_ctx context
+
+   Returns:
+
+       -  0 apiversion of bridge is compatible
+          (equal or greater to apiversion needed)
+       -  non-zero otherwise
+*/
+int hue_rest_validate_apiversion(struct hue_rest_ctx *ctx);
 
 /* Function: hue_rest_register
 
