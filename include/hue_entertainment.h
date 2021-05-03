@@ -110,5 +110,3 @@ int hue_ent_get_message(struct hue_ent_ctx *ctx, void **out_msg_buf, int *out_bu
       ctx - hue_ent_ctx object
 */
 void hue_ent_cleanup(struct hue_ent_ctx *ctx);
-
-
