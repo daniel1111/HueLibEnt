@@ -27,9 +27,11 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "dtls.h"
+#include "hue_debug.h"
+#include "hue_dtls.h"
 #include "hue_entertainment.h"
 #include "hue_rest.h"
+
 
 #define DTLS_PORT 2100
 #define SSL_PORT  443
@@ -53,8 +55,8 @@ int main (int argc, char **argv)
   const char *psk = NULL;
   const char *ip_address = NULL;
   int c;
-  int debug_level = MSG_ERR;
-  struct dtls_ctx ctx_dtls;
+  int debug_level = HUE_MSG_ERR;
+  struct hue_dtls_ctx ctx_dtls;
   struct hue_ent_ctx ctx_ent;
   struct hue_rest_ctx ctx_hr;
   struct hue_entertainment_area *ent_areas;
@@ -162,14 +164,14 @@ int main (int argc, char **argv)
 
   /* Connect to bridge using DTLS */
   printf("Making DTLS connection to bridge\n");
-  dtls_init(&ctx_dtls, identity, psk, NULL, debug_level);
-  int retval = dtls_connect(&ctx_dtls, ip_address, DTLS_PORT);
+  hue_dtls_init(&ctx_dtls, identity, psk, NULL, debug_level);
+  int retval = hue_dtls_connect(&ctx_dtls, ip_address, DTLS_PORT);
   if (retval)
   {
     printf("Failed to make DTLS connection to bridge (retval=%d)\n", retval);
     hue_rest_cleanup_ctx(&ctx_hr);
     hue_rest_cleanup();
-    dtls_cleanup(&ctx_dtls);
+    hue_dtls_cleanup(&ctx_dtls);
     hue_ent_cleanup(&ctx_ent);
     return -3;
   }
@@ -223,7 +225,7 @@ int main (int argc, char **argv)
     hue_ent_get_message(&ctx_ent, &msg_buf, &buf_len);
 
     /* Send message */
-    if (dtls_send_data(&ctx_dtls, msg_buf, buf_len))
+    if (hue_dtls_send_data(&ctx_dtls, msg_buf, buf_len))
     {
       printf("Connection lost, exiting...\n");
       break;
@@ -232,7 +234,7 @@ int main (int argc, char **argv)
 
   hue_rest_cleanup_ctx(&ctx_hr);
   hue_rest_cleanup();
-  dtls_cleanup(&ctx_dtls);
+  hue_dtls_cleanup(&ctx_dtls);
   hue_ent_cleanup(&ctx_ent);
 
   return 0;
