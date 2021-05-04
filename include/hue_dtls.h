@@ -20,13 +20,14 @@
 #include <openssl/opensslv.h>
 #include <math.h>
 #include <ctype.h>
-#include "debug.h"
+#include "hue_debug.h"
 
-#define DTLS_STATE_INIT      10
-#define DTLS_STATE_CONNECTED 20
-#define DTLS_STATE_CLEANEDUP 30
+#define HUE_DTLS_MAX_PAYLOAD_SIZE 1350
+#define HUE_DTLS_STATE_INIT      10
+#define HUE_DTLS_STATE_CONNECTED 20
+#define HUE_DTLS_STATE_CLEANEDUP 30
 
-struct dtls_ctx
+struct hue_dtls_ctx
 {
   SSL_CTX *ssl_ctx;
   SSL  *ssl;
@@ -40,16 +41,16 @@ struct dtls_ctx
   int  state;
   void *user_data;
   int  debug_level;
-  debug_cb_t debug_callback;
+  hue_debug_cb_t debug_callback;
 };
 
-/* Function: dtls_init
+/* Function: hue_dtls_init
 
-   Initialise a new dtls_ctx object. Be sure to call dtls_cleanup when finished with ctx.
+   Initialise a new hue_dtls_ctx object. Be sure to call dtls_cleanup when finished with ctx.
 
    Parameters:
 
-      ctx - dtls_ctx object to initialise
+      ctx - hue_dtls_ctx object to initialise
       psk_identity - Pre-shared key identity for the session
       psk_key - Pre-shared key for the session
       debug_callback - (optional) debug callback to receive debug messages. Set to NULL to print to STDOUT.
@@ -59,15 +60,15 @@ struct dtls_ctx
 
       0 on success, non-zero otherwise
 */
-int  dtls_init(struct dtls_ctx *ctx, const char *psk_identity, const char *psk_key, debug_cb_t debug_callback, int debug_level);
+int  hue_dtls_init(struct hue_dtls_ctx *ctx, const char *psk_identity, const char *psk_key, hue_debug_cb_t debug_callback, int debug_level);
 
-/* Function: dtls_connect
+/* Function: hue_dtls_connect
 
    Start dtls connection
 
    Parameters:
 
-      ctx - Initialised dtls_ctx object
+      ctx - Initialised hue_dtls_ctx object
       address - IP address to connect to
       port - port number
 
@@ -75,15 +76,15 @@ int  dtls_init(struct dtls_ctx *ctx, const char *psk_identity, const char *psk_k
 
       0 on success, non-zero otherwise
 */
-int  dtls_connect(struct dtls_ctx *ctx, const char *address, int port);
+int  hue_dtls_connect(struct hue_dtls_ctx *ctx, const char *address, int port);
 
-/* Function: dtls_send_data
+/* Function: hue_dtls_send_data
 
    Send data on connecion
 
    Parameters:
 
-      ctx - Connected dtls_ctx object
+      ctx - Connected hue_dtls_ctx object
       buf - data to send
       port - length of data to send
 
@@ -91,14 +92,14 @@ int  dtls_connect(struct dtls_ctx *ctx, const char *address, int port);
 
       0 on success, non-zero otherwise
 */
-int  dtls_send_data(struct dtls_ctx *ctx, void *buf, int length);
+int  hue_dtls_send_data(struct hue_dtls_ctx *ctx, void *buf, int length);
 
-/* Function: dtls_cleanup
+/* Function: hue_dtls_cleanup
 
    Disconnect if connected, and free any memory associated with dtls context.
 
    Parameters:
 
-      ctx - dtls_ctx object
+      ctx - hue_dtls_ctx object
 */
-void dtls_cleanup(struct dtls_ctx *ctx);
+void hue_dtls_cleanup(struct hue_dtls_ctx *ctx);

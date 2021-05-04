@@ -29,7 +29,7 @@
 #include <libconfig.h>
 #include <signal.h>
 
-#include "dtls.h"
+#include "hue_dtls.h"
 #include "hue_entertainment.h"
 #include "hue_rest.h"
 
@@ -145,7 +145,7 @@ int get_bridge_credentials(const char *name, const char *credentials_filename, c
     struct hue_rest_ctx ctx_hr;
 
     hue_rest_init();
-    hue_rest_init_ctx(&ctx_hr, NULL, cmdline_ipaddress, SSL_PORT, "", MSG_ERR);
+    hue_rest_init_ctx(&ctx_hr, NULL, cmdline_ipaddress, SSL_PORT, "", HUE_MSG_ERR);
     retval = hue_rest_register(&ctx_hr, &out_username, &out_clientkey);
     if (retval)
     {
@@ -272,7 +272,7 @@ int main (int argc, char **argv)
   void *audio_ctx;
   void *process_ctx;
 
-  struct dtls_ctx ctx_dtls;
+  struct hue_dtls_ctx ctx_dtls;
   struct hue_ent_ctx ctx_ent;
   struct hue_rest_ctx ctx_hr;
   struct hue_entertainment_area *ent_areas;
@@ -348,7 +348,7 @@ int main (int argc, char **argv)
   }
 
   hue_rest_init();
-  hue_rest_init_ctx(&ctx_hr, NULL, connection_ip, SSL_PORT, connection_username, MSG_ERR);
+  hue_rest_init_ctx(&ctx_hr, NULL, connection_ip, SSL_PORT, connection_username, HUE_MSG_ERR);
 
   printf("Getting entertainment areas\n");
   hue_rest_get_ent_groups(&ctx_hr, &ent_areas, &ent_areas_count);
@@ -394,15 +394,15 @@ int main (int argc, char **argv)
 
   /* Connect to bridge using DTLS */
   printf("Making DTLS connection to bridge\n");
-  dtls_init(&ctx_dtls, connection_username, connection_psk, NULL, MSG_ERR);
-  int retval = dtls_connect(&ctx_dtls, connection_ip, DTLS_PORT);
+  hue_dtls_init(&ctx_dtls, connection_username, connection_psk, NULL, HUE_MSG_ERR);
+  int retval = hue_dtls_connect(&ctx_dtls, connection_ip, DTLS_PORT);
   if (retval)
   {
     printf("Failed to make DTLS connection to bridge (retval=%d)\n", retval);
     config_destroy(&cfg_config);
     hue_rest_cleanup_ctx(&ctx_hr);
     hue_rest_cleanup();
-    dtls_cleanup(&ctx_dtls);
+    hue_dtls_cleanup(&ctx_dtls);
     hue_ent_cleanup(&ctx_ent);
     return -3;
   }
@@ -417,7 +417,7 @@ int main (int argc, char **argv)
     config_destroy(&cfg_config);
     hue_rest_cleanup_ctx(&ctx_hr);
     hue_rest_cleanup();
-    dtls_cleanup(&ctx_dtls);
+    hue_dtls_cleanup(&ctx_dtls);
     hue_ent_cleanup(&ctx_ent);
     return -5;
   }
@@ -429,7 +429,7 @@ int main (int argc, char **argv)
     config_destroy(&cfg_config);
     hue_rest_cleanup_ctx(&ctx_hr);
     hue_rest_cleanup();
-    dtls_cleanup(&ctx_dtls);
+    hue_dtls_cleanup(&ctx_dtls);
     hue_ent_cleanup(&ctx_ent);
     return -1;
   }
@@ -448,7 +448,7 @@ int main (int argc, char **argv)
 
     hue_ent_get_message(&ctx_ent, &msg_buf, &buf_len);
 
-    if (dtls_send_data(&ctx_dtls, msg_buf, buf_len))
+    if (hue_dtls_send_data(&ctx_dtls, msg_buf, buf_len))
     {
       printf("Connection lost, exiting...\n");
       config_destroy(&cfg_config);
@@ -457,7 +457,7 @@ int main (int argc, char **argv)
       ap.cleanup(&process_ctx);
       hue_rest_cleanup_ctx(&ctx_hr);
       hue_rest_cleanup();
-      dtls_cleanup(&ctx_dtls);
+      hue_dtls_cleanup(&ctx_dtls);
       hue_ent_cleanup(&ctx_ent);
       return -4;
     }
@@ -469,7 +469,7 @@ int main (int argc, char **argv)
   config_destroy(&cfg_config);
   hue_rest_cleanup_ctx(&ctx_hr);
   hue_rest_cleanup();
-  dtls_cleanup(&ctx_dtls);
+  hue_dtls_cleanup(&ctx_dtls);
   hue_ent_cleanup(&ctx_ent);
   return 0;
 }

@@ -33,7 +33,7 @@
 
 enum req_type { REQTYPE_GET, REQTYPE_PUT, REQTYPE_POST, REQTYPE_DELETE };
 
-static void debug(struct hue_rest_ctx *ctx, int level, char *fmt, ...)
+void hue_debug(struct hue_rest_ctx *ctx, int level, char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
@@ -65,6 +65,37 @@ void free_if_not_null(void **ptr)
   }
 }
 
+int compare_version_string(const char *version_needed, const char *version_found)
+{
+  unsigned version_major_needed = 0;
+  unsigned version_minor_needed = 0;
+  unsigned version_patch_needed = 0;
+
+  unsigned version_major_found = 0;
+  unsigned version_minor_found = 0;
+  unsigned version_patch_found = 0;
+
+  sscanf(version_needed, "%u.%u.%u", &version_major_needed, &version_minor_needed, &version_patch_needed);
+  sscanf(version_found, "%u.%u.%u", &version_major_found, &version_minor_found, &version_patch_found);
+
+  if (version_major_needed < version_major_found)
+    return 1;
+  if (version_major_needed > version_major_found)
+    return -1;
+
+  if (version_minor_needed < version_minor_found)
+    return 1;
+  if (version_minor_needed > version_minor_found)
+    return -1;
+
+  if (version_patch_needed < version_patch_found)
+    return 1;
+  if (version_patch_needed > version_patch_found)
+    return -1;
+
+  return 0;
+}
+
 int hue_rest_init()
 {
   return curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -94,7 +125,7 @@ static void free_whitelist(struct hue_rest_ctx *ctx)
   ctx->whitelist_count = 0;
 }
 
-int hue_rest_init_ctx(struct hue_rest_ctx *ctx, debug_cb_t debug_callback, const char *address, int port, const char *username, int debug_level)
+int hue_rest_init_ctx(struct hue_rest_ctx *ctx, hue_debug_cb_t debug_callback, const char *address, int port, const char *username, int debug_level)
 {
   int len;
 
@@ -129,7 +160,7 @@ void hue_rest_cleanup_ctx(struct hue_rest_ctx *ctx)
   free_if_not_null((void **)&ctx->received_data);
   free_if_not_null((void **)&ctx->upload_data);
   free_if_not_null((void **)&ctx->ent_areas);
-  free_if_not_null((void **)&ctx->ent_areas);
+  free_if_not_null((void **)&ctx->apiversion);
   free_if_not_null((void **)&ctx->clientkey);
 
   free_whitelist(ctx);
@@ -151,7 +182,7 @@ static size_t curl_read_cb(void *ptr, size_t size, size_t nmemb, void *stream)
     bytes_to_copy = ctx->upload_data_length;
 
   memcpy(ptr, ctx->upload_data, bytes_to_copy);
-  debug(ctx, MSG_INFO, " > %.*s", bytes_to_copy, ptr);
+  hue_debug(ctx, HUE_MSG_INFO, " > %.*s", bytes_to_copy, ptr);
 
   return bytes_to_copy;
 }
@@ -164,10 +195,10 @@ static int curl_trace_cb(CURL *handle, curl_infotype type, char *data, size_t si
 
   if (type == CURLINFO_TEXT)
   {
-    /* remove \n, as debug() adds it */
+    /* remove \n, as hue_debug() adds it */
     if (size > 2)
       data[size-1] = '\0';
-    debug(ctx, MSG_DEBUG, "curl: %s", data);
+    hue_debug(ctx, HUE_MSG_DEBUG, "curl: %s", data);
   }
   return 0;
 }
@@ -178,13 +209,13 @@ static size_t curl_write_cb(void *contents, size_t size, size_t nmemb, void *use
   struct hue_rest_ctx *ctx = userp;
   size_t realsize = size * nmemb;
 
-  debug(ctx, MSG_DEBUG, "curl_write_cb> recieved %d bytes", size * nmemb);
+  hue_debug(ctx, HUE_MSG_DEBUG, "curl_write_cb> recieved %d bytes", size * nmemb);
 
   char *ptr = realloc(ctx->received_data, ctx->received_data_length + realsize + 1);
   if(ptr == NULL)
   {
     /* out of memory! */
-    debug(ctx, MSG_ERR, "curl_write_cb> not enough memory (realloc returned NULL)\n");
+    hue_debug(ctx, HUE_MSG_ERR, "curl_write_cb> not enough memory (realloc returned NULL)\n");
     return 0;
   }
 
@@ -259,9 +290,9 @@ static int configure_curl(struct hue_rest_ctx *ctx, enum req_type rt, const char
 
     /* Check for errors */
     if (res != CURLE_OK)
-      debug(ctx, MSG_ERR, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
+      hue_debug(ctx, HUE_MSG_ERR, "curl_easy_perform() failed: %s", curl_easy_strerror(res));
     else
-      debug(ctx, MSG_INFO, " < %.*s", ctx->received_data_length, ctx->received_data);
+      hue_debug(ctx, HUE_MSG_INFO, " < %.*s", ctx->received_data_length, ctx->received_data);
 
     /* always cleanup */
     curl_easy_cleanup(curl);
@@ -270,7 +301,7 @@ static int configure_curl(struct hue_rest_ctx *ctx, enum req_type rt, const char
   }
   else
   {
-    debug(ctx, MSG_ERR, "curl_easy_init() failed");
+    hue_debug(ctx, HUE_MSG_ERR, "curl_easy_init() failed");
     return -1;
   }
 }
@@ -290,7 +321,7 @@ int hue_rest_activate_stream(struct hue_rest_ctx *ctx, int group)
   snprintf(url, sizeof(url), "https://%s:%d/api/%s/groups/%d",
            ctx->address, ctx->port, ctx->username, group);
   url[sizeof(url)-1] = '\0';
-  debug(ctx, MSG_INFO, "URL = %s", url);
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
 
   /* make PUT request */
   retval = configure_curl(ctx, REQTYPE_PUT, url);
@@ -314,26 +345,26 @@ static int parse_error_message(struct hue_rest_ctx *ctx, const char* msg, int *o
 {
   char *error_msg;
 
-  debug(ctx, MSG_DEBUG, "parse_error_message> %s", msg);
+  hue_debug(ctx, HUE_MSG_DEBUG, "parse_error_message> %s", msg);
 
   json_object *jobj = json_tokener_parse(msg);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_ERR, "Failed to parse JSON received: %s", msg);
+    hue_debug(ctx, HUE_MSG_ERR, "Failed to parse JSON received: %s", msg);
     return -1;
   }
   *out_type = 0;
 
   if (!json_object_is_type(jobj, json_type_array))
   {
-     debug(ctx, MSG_DEBUG, "Not an error message (not an array)");
+     hue_debug(ctx, HUE_MSG_DEBUG, "Not an error message (not an array)");
      json_object_put(jobj);
      return 0;
   }
 
   if (json_object_array_length(jobj) <= 0)
   {
-    debug(ctx, MSG_DEBUG, "Not an error");
+    hue_debug(ctx, HUE_MSG_DEBUG, "Not an error");
     json_object_put(jobj);
     return 0;
   }
@@ -344,7 +375,7 @@ static int parse_error_message(struct hue_rest_ctx *ctx, const char* msg, int *o
   json_object_object_get_ex(obj, "error", &obj_param);
   if (obj_param == NULL)
   {
-    debug(ctx, MSG_DEBUG, "Not an error message");
+    hue_debug(ctx, HUE_MSG_DEBUG, "Not an error message");
     json_object_put(jobj);
     return 0;
   }
@@ -352,7 +383,7 @@ static int parse_error_message(struct hue_rest_ctx *ctx, const char* msg, int *o
   error_msg = malloc(strlen(json_object_get_string(obj_param)) + 1);
   if (error_msg == NULL)
   {
-    debug(ctx, MSG_ERR, "parse_error_message> Failed to allocate memory!");
+    hue_debug(ctx, HUE_MSG_ERR, "parse_error_message> Failed to allocate memory!");
     json_object_put(jobj);
     return -1;
   }
@@ -365,14 +396,14 @@ static int parse_error_message(struct hue_rest_ctx *ctx, const char* msg, int *o
 
   if (obj_param == NULL)
   {
-    debug(ctx, MSG_ERR, "Failed to find type in error message");
+    hue_debug(ctx, HUE_MSG_ERR, "Failed to find type in error message");
     json_object_put(jobj);
     free(error_msg);
     return -1;
   }
 
   *out_type = json_object_get_int(obj_param);
-  debug(ctx, MSG_DEBUG, "error type: %d", *out_type);
+  hue_debug(ctx, HUE_MSG_DEBUG, "error type: %d", *out_type);
   json_object_put(jobj);
   free(error_msg);
 
@@ -394,13 +425,13 @@ static char* extract_json_whitelist_from_config(struct hue_rest_ctx *ctx)
   json_object *jobj = json_tokener_parse(ctx->received_data);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_ERR, "Failed to parse JSON received: %s", ctx->received_data);
+    hue_debug(ctx, HUE_MSG_ERR, "Failed to parse JSON received: %s", ctx->received_data);
     return NULL;
   }
 
   if (json_object_get_type(jobj) !=  json_type_object)
   {
-    debug(ctx, MSG_INFO, "Unexpected JSON received");
+    hue_debug(ctx, HUE_MSG_INFO, "Unexpected JSON received");
     json_object_put(jobj);
     return NULL;
   }
@@ -435,14 +466,14 @@ static char *get_value_from_jobj(struct hue_rest_ctx *ctx, json_object *jobj, co
   json_object *obj_param = NULL;
   if (!json_object_object_get_ex(jobj, key, &obj_param))
   {
-    debug(ctx, MSG_ERR, "get_value_from_jobj> Failed to get [%s] from JSON", key);
+    hue_debug(ctx, HUE_MSG_ERR, "get_value_from_jobj> Failed to get [%s] from JSON", key);
     return NULL;
   }
 
   const char *param_val = json_object_get_string(obj_param);
   if (param_val == NULL)
   {
-    debug(ctx, MSG_ERR, "get_value_from_jobj> failed to get value for [%s]", key);
+    hue_debug(ctx, HUE_MSG_ERR, "get_value_from_jobj> failed to get value for [%s]", key);
     return NULL;
   }
 
@@ -450,20 +481,40 @@ static char *get_value_from_jobj(struct hue_rest_ctx *ctx, json_object *jobj, co
   if (value)
     strcpy(value, param_val);
   else
-    debug(ctx, MSG_ERR, "get_value_from_jobj> failed to allocate memory!");
+    hue_debug(ctx, HUE_MSG_ERR, "get_value_from_jobj> failed to allocate memory!");
 
   return value;
+}
+
+// {"name":"Hue Bridge","datastoreversion":"99","swversion":"1943185030","apiversion":"1.43.0","mac":"00:17:88:2d:30:81","bridgeid":"001788FFFE2D3081","factorynew":false,"replacesbridgeid":null,"modelid":"BSB002","starterkitid":""}
+static int parse_unauth_configuration_response_json(struct hue_rest_ctx *ctx)
+{
+  const char *apiversion;
+  hue_debug(ctx, HUE_MSG_DEBUG, "parse_unauth_configuration_response> %s", ctx->received_data);
+
+  json_object *jobj = json_tokener_parse(ctx->received_data);
+  if (jobj == NULL)
+  {
+    hue_debug(ctx, HUE_MSG_ERR, "parse_unauth_configuration_response> Failed to parse JSON received: %s", ctx->received_data);
+    return -1;
+  }
+
+  free_if_not_null((void **)&ctx->apiversion);
+  ctx->apiversion = get_value_from_jobj(ctx, jobj, "apiversion");
+  json_object_put(jobj);
+
+  return 0;
 }
 
 // [{"success":{"username":"xM7Kno9zv7J8vIiM0rTjPU1NJsMjJpafXG4q8yqQ","clientkey":"B95676C8F5E21AEAD54E5D8A38844A21"}}]
 static int parse_register_response(struct hue_rest_ctx *ctx)
 {
-  debug(ctx, MSG_DEBUG, "parse_register_response> %s", ctx->received_data);
+  hue_debug(ctx, HUE_MSG_DEBUG, "parse_register_response> %s", ctx->received_data);
 
   json_object *jobj = json_tokener_parse(ctx->received_data);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_ERR, "parse_register_response> Failed to parse JSON received: %s", ctx->received_data);
+    hue_debug(ctx, HUE_MSG_ERR, "parse_register_response> Failed to parse JSON received: %s", ctx->received_data);
     return -1;
   }
 
@@ -473,7 +524,7 @@ static int parse_register_response(struct hue_rest_ctx *ctx)
   json_object_object_get_ex(obj, "success", &obj_param);
   if (obj_param == NULL)
   {
-    debug(ctx, MSG_ERR, "parse_register_response> Not an success message");
+    hue_debug(ctx, HUE_MSG_ERR, "parse_register_response> Not an success message");
     json_object_put(jobj);
     return -1;
   }
@@ -498,7 +549,7 @@ static int add_whitelist_entry(struct hue_rest_ctx *ctx, struct hue_whitelist_en
   json_object *jobj = json_tokener_parse(data);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_ERR, "Failed to parse JSON: %s", data);
+    hue_debug(ctx, HUE_MSG_ERR, "Failed to parse JSON: %s", data);
     return -1;
   }
 
@@ -525,14 +576,14 @@ static int extract_json_entries_from_whitelist(struct hue_rest_ctx *ctx, char *j
 
   if (json_whitelist == NULL)
   {
-    debug(ctx, MSG_INFO, "Empty/NULL whitelist!");
+    hue_debug(ctx, HUE_MSG_INFO, "Empty/NULL whitelist!");
     return -1;
   }
 
   json_object *jobj = json_tokener_parse(json_whitelist);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_ERR, "Failed to parse JSON whitelist: %s", json_whitelist);
+    hue_debug(ctx, HUE_MSG_ERR, "Failed to parse JSON whitelist: %s", json_whitelist);
     return -1;
   }
 
@@ -575,7 +626,7 @@ static int parse_entertainment_groups_json(struct hue_rest_ctx *ctx, struct hue_
   json_object *jobj = json_tokener_parse(ctx->received_data);
   if (jobj == NULL)
   {
-    debug(ctx, MSG_DEBUG, "Failed to parse JSON received: %s", ctx->received_data);
+    hue_debug(ctx, HUE_MSG_DEBUG, "Failed to parse JSON received: %s", ctx->received_data);
     return -1;
   }
 
@@ -584,15 +635,15 @@ static int parse_entertainment_groups_json(struct hue_rest_ctx *ctx, struct hue_
     if (retval < 0)
     {
       /* Parse error, or something bad */
-      debug(ctx, MSG_ERR, "Failed to parse groups response");
+      hue_debug(ctx, HUE_MSG_ERR, "Failed to parse groups response");
     }
     else
     {
       /* Error has been reported by the bridge */
       if (error_type == HUE_ERR_UNAUTHORIZED)
-        debug(ctx, MSG_ERR, "Get groups failed: Unauthorized."); /* Link button on the bridge hasn't been pressed in the last 30s */
+        hue_debug(ctx, HUE_MSG_ERR, "Get groups failed: Unauthorized."); /* Link button on the bridge hasn't been pressed in the last 30s */
       else
-        debug(ctx, MSG_ERR, "Get groups failed: Unexpected error type (%d) received from bridge", error_type);
+        hue_debug(ctx, HUE_MSG_ERR, "Get groups failed: Unexpected error type (%d) received from bridge", error_type);
 
       retval = error_type;
     }
@@ -602,7 +653,7 @@ static int parse_entertainment_groups_json(struct hue_rest_ctx *ctx, struct hue_
 
   if (json_object_get_type(jobj) !=  json_type_object)
   {
-    debug(ctx, MSG_DEBUG, "Unexpected JSON received");
+    hue_debug(ctx, HUE_MSG_DEBUG, "Unexpected JSON received");
     json_object_put(jobj);
     return -1;
   }
@@ -620,7 +671,7 @@ static int parse_entertainment_groups_json(struct hue_rest_ctx *ctx, struct hue_
     json_object_iter_next(&it);
   }
 
-  debug(ctx, MSG_DEBUG, "found %d ent. area(s)", *out_areas_count);
+  hue_debug(ctx, HUE_MSG_DEBUG, "found %d ent. area(s)", *out_areas_count);
 
   /* Allocate memory for areas */
   *out_areas = malloc(*out_areas_count * sizeof(struct hue_entertainment_area));
@@ -680,7 +731,7 @@ int hue_rest_get_ent_groups(struct hue_rest_ctx *ctx, struct hue_entertainment_a
   snprintf(url, sizeof(url), "https://%s:%d/api/%s/groups",
            ctx->address, ctx->port, ctx->username);
   url[sizeof(url)-1] = '\0';
-  debug(ctx, MSG_INFO, "URL = %s", url);
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
 
   /* make GET request */
   retval = configure_curl(ctx, REQTYPE_GET, url);
@@ -693,13 +744,13 @@ int hue_rest_get_ent_groups(struct hue_rest_ctx *ctx, struct hue_entertainment_a
 
   if (retval)
   {
-    debug(ctx, MSG_DEBUG, "GET request failed.", url);
+    hue_debug(ctx, HUE_MSG_DEBUG, "GET request failed.", url);
     return -1;
   }
 
   if (parse_entertainment_groups_json(ctx, out_areas, out_areas_count))
   {
-    debug(ctx, MSG_DEBUG, "Failed to get entertainment group", url);
+    hue_debug(ctx, HUE_MSG_DEBUG, "Failed to get entertainment group", url);
     return -1;
   }
 
@@ -721,7 +772,7 @@ static int get_config(struct hue_rest_ctx *ctx)
   snprintf(url, sizeof(url), "https://%s:%d/api/%s/config",
            ctx->address, ctx->port, ctx->username);
   url[sizeof(url)-1] = '\0';
-  debug(ctx, MSG_INFO, "URL = %s", url);
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
 
   /* make GET request */
   retval = configure_curl(ctx, REQTYPE_GET, url);
@@ -729,7 +780,7 @@ static int get_config(struct hue_rest_ctx *ctx)
 
   if (retval)
   {
-    debug(ctx, MSG_DEBUG, "GET request failed.", url);
+    hue_debug(ctx, HUE_MSG_DEBUG, "GET request failed.", url);
     return -1;
   }
 
@@ -778,7 +829,7 @@ int hue_rest_delete_user(struct hue_rest_ctx *ctx, const char *username)
   snprintf(url, sizeof(url), "https://%s:%d/api/%s/config/whitelist/%s",
            ctx->address, ctx->port, ctx->username, username);
   url[sizeof(url)-1] = '\0';
-  debug(ctx, MSG_INFO, "URL = %s", url);
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
 
   /* make DELETE request */
   retval = configure_curl(ctx, REQTYPE_DELETE, url);
@@ -786,11 +837,64 @@ int hue_rest_delete_user(struct hue_rest_ctx *ctx, const char *username)
 
   if (retval)
   {
-    debug(ctx, MSG_ERR, "Delete request failed.", url);
+    hue_debug(ctx, HUE_MSG_ERR, "Delete request failed.", url);
     return -1;
   }
 
   return retval;
+}
+
+int get_unauth_config(struct hue_rest_ctx *ctx)
+{
+  int retval;
+  char url[254];
+
+  /* build up URL*/
+  snprintf(url, sizeof(url), "https://%s:%d/api/config", ctx->address, ctx->port);
+  url[sizeof(url)-1] = '\0';
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
+
+
+  /* make GET request */
+  retval = configure_curl(ctx, REQTYPE_GET, url);
+
+  if (ctx->apiversion)
+    ctx->apiversion = NULL;
+
+  if (retval)
+  {
+    hue_debug(ctx, HUE_MSG_DEBUG, "GET request failed.", url);
+    return -1;
+  }
+
+  if (parse_unauth_configuration_response_json(ctx))
+  {
+    hue_debug(ctx, HUE_MSG_DEBUG, "Failed to get unauth config", url);
+    return -1;
+  }
+
+  return retval;
+}
+
+int hue_rest_validate_apiversion(struct hue_rest_ctx *ctx)
+{
+  int retval;
+  char api_version_needed[] = HUE_ENTERTAINMENT_API_NEEDED;
+
+  if(get_unauth_config(ctx))
+  {
+    hue_debug(ctx, HUE_MSG_DEBUG, "Failed to compare version string", NULL);
+    return -1;
+  }
+
+  retval = compare_version_string(api_version_needed, ctx->apiversion);
+  if (retval < 0) {
+    hue_debug(ctx, HUE_MSG_INFO, "api version found (%s) is to low. must be >= 1.22.0", ctx->apiversion);
+    return -1;
+  }
+  hue_debug(ctx, HUE_MSG_DEBUG, "api version found (%s) is compatible", ctx->apiversion);
+
+  return 0;
 }
 
 int hue_rest_register(struct hue_rest_ctx *ctx, char **out_username, char **out_clientkey)
@@ -806,14 +910,14 @@ int hue_rest_register(struct hue_rest_ctx *ctx, char **out_username, char **out_
   /* build up URL */
   snprintf(url, sizeof(url), "https://%s:%d/api", ctx->address, ctx->port);
   url[sizeof(url)-1] = '\0';
-  debug(ctx, MSG_INFO, "URL = %s", url);
+  hue_debug(ctx, HUE_MSG_INFO, "URL = %s", url);
 
   /* Generate payload */
   devicetype = get_device_type(ctx);
   ctx->upload_data_length = snprintf(NULL, 0, "{\"devicetype\":\"%s\",\"generateclientkey\":true}", devicetype)+1;
   ctx->upload_data = calloc(ctx->upload_data_length+1, 1);
   snprintf(ctx->upload_data, ctx->upload_data_length, "{\"devicetype\":\"%s\",\"generateclientkey\":true}", devicetype);
-  debug(ctx, MSG_INFO, "Body = %s", ctx->upload_data);
+  hue_debug(ctx, HUE_MSG_INFO, "Body = %s", ctx->upload_data);
 
   /* make POST request */
   retval = configure_curl(ctx, REQTYPE_POST, url);
@@ -827,7 +931,7 @@ int hue_rest_register(struct hue_rest_ctx *ctx, char **out_username, char **out_
 
   if (retval)
   {
-    debug(ctx, MSG_ERR, "Register failed.", url);
+    hue_debug(ctx, HUE_MSG_ERR, "Register failed.", url);
     return -1;
   }
 
@@ -836,15 +940,15 @@ int hue_rest_register(struct hue_rest_ctx *ctx, char **out_username, char **out_
     if (retval < 0)
     {
       /* Parse error, or something bad */
-      debug(ctx, MSG_ERR, "Register failed", url);
+      hue_debug(ctx, HUE_MSG_ERR, "Register failed", url);
     }
     else
     {
       /* Error has been reported by the bridge */
       if (error_type == HUE_ERR_LINK_BUTTON_NOT_PUSHED)
-        debug(ctx, MSG_ERR, "Register failed: Link button on the bridge not pressed within last 30 seconds"); /* Link button on the bridge hasn't been pressed in the last 30s */
+        hue_debug(ctx, HUE_MSG_ERR, "Register failed: Link button on the bridge not pressed within last 30 seconds"); /* Link button on the bridge hasn't been pressed in the last 30s */
       else
-        debug(ctx, MSG_ERR, "Register failed: Unexpected error type (%d) received from bridge", error_type); /* ??? Why else is registration likely to fail? */
+        hue_debug(ctx, HUE_MSG_ERR, "Register failed: Unexpected error type (%d) received from bridge", error_type); /* ??? Why else is registration likely to fail? */
 
       retval = error_type;
     }
